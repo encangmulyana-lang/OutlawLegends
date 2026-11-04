@@ -40,18 +40,19 @@ pre{white-space:pre-wrap;background:#0b0603;padding:12px;border-radius:10px;over
 <h1>OUTLAW<br>LEGENDS</h1>
 <p>Desert cowboys, bounty hunters, gunslingers — and one Ghost Rider. The posse is gathering. No sheriff can stop this mint.</p>
 <p><a class="btn" href="#mint">JOIN THE POSSE — MINT</a></p>
-<p class="muted">Mint status: <b>PREVIEW — contract not deployed yet.</b> The Mint button stays disabled until deploy, so nobody can mint a broken promise.</p></div>
+<p class="muted">Mint status: <b>LIVE</b> · Contract: <span id="contractAddr">0xE544a2252Efef7D22abF96653aC55dC59a524Ab8</span></p></div>
 <div class="marquee"><div>★ WANTED ★ 3,333 OUTLAWS ★ 0.0003 BNB ★ DEAD OR MINTED ★&nbsp;&nbsp;★ WANTED ★ 3,333 OUTLAWS ★ 0.0003 BNB ★ DEAD OR MINTED ★&nbsp;&nbsp;</div></div>
 <div id="mint" style="text-align:center;padding:28px 8px"><h2>THE SHOWDOWN</h2>
 <p><b>Minted:</b> 0 / 3,333 · <b>Price:</b> 0.0003 BNB each · <b>Max:</b> 10 per transaction</p>
 <div class="bar"><div></div></div>
 <p><button class="btn" onclick="chg(-1)">−</button> <input id="qty" value="1" readonly> <button class="btn" onclick="chg(1)">+</button> <button class="btn" onclick="setMax()">MAX</button></p>
 <p id="total">Total: 0.0003 BNB</p>
-<p><button class="btn btn2" disabled>CONNECT WALLET (activates after deploy)</button> <button class="btn btn2" disabled>MINT NFT (activates after deploy)</button></p>
+<p><button class="btn btn2" id="connectBtn">CONNECT WALLET</button> <label class="muted">Qty: <input id="qtyInput" type="number" min="1" max="10" value="1" style="width:56px"></label> <button class="btn btn2" id="mintBtn">MINT NFT</button></p>
+<p id="mintMsg" class="muted"></p>
 <p id="walletStatus" class="muted">Wallet mint will be the primary route. On a phone, open this site inside a wallet app browser — a regular phone browser has no wallet to connect. Minting via the Binance Agentic Wallet agent prompt stays as the alternative.</p>
 <p id="txlog" class="muted">No transaction has been created from this page.</p>
-<div style="text-align:left"><p><b>Mint with your agent — alternative (after deploy):</b></p>
-<pre>Contract: TBD (OutlawLegends / OUTLAW, ERC-721)
+<div style="text-align:left"><p><b>Mint with your agent — alternative:</b></p>
+<pre>Contract: 0xE544a2252Efef7D22abF96653aC55dC59a524Ab8 (OutlawLegends / OUTLAW, ERC-721)
 Function: mint(uint256 quantity), selector 0xa0712d68
 Quantity: up to 10, Price: 0.0003 BNB each, Supply: 3,333, BNB Chain (56)</pre></div></div>
 <div id="rarity"><h2>RARITY OF THE POSSE</h2>
@@ -64,4 +65,38 @@ Quantity: up to 10, Price: 0.0003 BNB each, Supply: 3,333, BNB Chain (56)</pre><
 function chg(d){let q=parseInt(document.getElementById('qty').value)+d; if(q<1)q=1; if(q>10)q=10; document.getElementById('qty').value=q; document.getElementById('total').textContent='Total: '+(q*0.0003).toFixed(4)+' BNB';}
 function setMax(){document.getElementById('qty').value=10; document.getElementById('total').textContent='Total: 0.0030 BNB';}
 const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting)e.target.classList.add('vis')}));document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
-</script></body></html>
+</script><script src="https://cdn.jsdelivr.net/npm/ethers@6.13.4/dist/ethers.umd.min.js"></script>
+<script>
+const CONTRACT='0xE544a2252Efef7D22abF96653aC55dC59a524Ab8';
+const ABI=['function mint(uint256 quantity) payable'];
+let signer=null;
+async function connectWallet(){
+  const st=document.getElementById('walletStatus'),msg=document.getElementById('mintMsg');
+  if(!window.ethereum){st.textContent='No browser wallet detected. On a phone, open this site inside a wallet app browser (e.g. Trust Wallet / MetaMask browser), or use the agent prompt below.';return;}
+  try{
+    const provider=new ethers.BrowserProvider(window.ethereum);
+    await provider.send('eth_requestAccounts',[]);
+    const net=await provider.getNetwork();
+    if(net.chainId!==56n){try{await window.ethereum.request({method:'wallet_switchEthereumChain',params:[{chainId:'0x38'}]});}catch(e){st.textContent='Please switch your wallet to BNB Smart Chain (56) and try again.';return;}}
+    signer=await provider.getSigner();
+    const addr=await signer.getAddress();
+    st.textContent='Connected: '+addr.slice(0,6)+'…'+addr.slice(-4)+' (BNB Chain)';
+  }catch(e){st.textContent='Wallet connection failed: '+(e.message||e);}
+}
+async function mintNft(){
+  const msg=document.getElementById('mintMsg');
+  if(!signer){msg.textContent='Connect your wallet first.';return;}
+  const qty=Math.min(10,Math.max(1,parseInt(document.getElementById('qtyInput').value)||1));
+  try{
+    msg.textContent='Sending mint transaction… confirm in your wallet.';
+    const c=new ethers.Contract(CONTRACT,ABI,signer);
+    const tx=await c.mint(qty,{value:ethers.parseEther((0.0003*qty).toFixed(6))});
+    msg.textContent='Transaction sent: '+tx.hash+' — waiting for confirmation…';
+    await tx.wait();
+    msg.textContent='Mint confirmed! Transaction: '+tx.hash;
+  }catch(e){msg.textContent='Mint failed: '+(e.message||e);}
+}
+document.getElementById('connectBtn').addEventListener('click',connectWallet);
+document.getElementById('mintBtn').addEventListener('click',mintNft);
+</script>
+</body></html>
